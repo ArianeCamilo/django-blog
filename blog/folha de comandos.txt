@@ -1,0 +1,385 @@
+Ativer virtual env:
+cd Django
+. venv/bin/activate
+
+Criar o projeto Django
+django-admin startproject blog
+
+Rodar o projeto
+python3 manage.py runserver
+(Ctrl+C para parar o servidor)
+
+Criar tabelas no banco de dados
+python3 manage.py migrate
+
+Criar superusuario
+python3 manage.py createsuperuser 
+(sug: definir 'admin')
+
+---
+
+Criando URL e view
+1 - incluir em urls.py > urlpatterns: 
+    [path('admin/', admin.site.urls),
+    path('hello/', hello_world),] 
+
+2 - novo arquivo 'views.py':
+    from django.http import HttpResponse
+
+    def hello_world(request):
+        return HttpResponse("Hello world")
+
+3 - importar a view em urls.py:
+    from .views import hello_world
+
+4 - Acessar por http://127.0.0.1:8000/hello/
+
+---
+
+Criando model e registrando no admin
+1 - criar um app com:
+    python3 manage.py startapp website 
+
+2 - adicionar 'website' em settings.py > INSTALLED_APPS (se não for automático)
+
+3 - website > models.py:
+    class Post(models.Model):
+    title = models.CharField(max_length=100)
+    sub_title = models.CharField(max_length=200)
+    content = models.TextField()
+
+4 - python3 manage.py makemigrations
+5 - python3 manage.py migrate
+
+6 - website > admin.py
+    from .models import Post
+    admin.site.register(Post)
+
+7 - python3 manage.py runserver 
+
+8 - Criar dois posts
+    
+---
+
+Renderizando o template
+1 - urls.py: 
+    incluir ', include' em 'from django.urls import path'
+    adicionar 'path('blog/', include(website.urls))' em urlpatterns
+
+2 - em website, criar urls.py:
+    from django.urls import path, include
+    from .views import hello_blog
+
+    urlpatterns = [
+        path('', hello_blog),
+    ]
+
+3 - em website, criar views.py:
+    def hello_blog(request):
+        return render(request, 'index.html')
+
+4 - website > criar pasta 'templates':
+    criar index.html - inserir conteúdo
+
+4 - python3 manage.py runserver (http://127.0.0.1:8000/blog/)
+
+---
+
+Inserindo dados no template dinamicamente
+1 - em views.py:
+    def hello_blog(request):
+        lista = ['django', 'python','git', 'html', 'Nginx']
+        data = {'name': 'Curso de Django 3', 'lista_tecnologias': lista}
+        return render(request, 'index.html', data)
+
+2 - em index.html:
+    <ul>
+    {% for item in lista_tecnologias %}
+        {% if item == 'django' %}
+            <li><b>{{ item }}</b></li>
+        {% else %}
+        <li>{{ item}}</li>
+        {% endif %}    
+    {% endfor%}
+    </ul>
+
+---
+
+Lendo posts do banco de dados
+1 - views.py:
+    adicionar
+    from .models import Post
+
+2 - adicionar em def hello_blog(request):    
+    list_posts = Post.objects.all()
+
+    data = {...
+       adicionar 'posts': list_posts}
+
+3 - no index.html:
+    {% for post in posts %}
+        <h2>{{ post.title }}</h2>
+        <h3>{{  post.subtitle }}</h3>
+        <p>{{ post.content }}</p>
+    {% endfor%}
+
+---
+
+Personalizando o Django admin
+1 - Em website > admin.py, criar a class para o PostAdmin com o list_display    
+    class PostAdmin(admin.ModelAdmin):
+        list_display = ['title', 'sub_title']
+        search_fields = ['title', 'sub_title']
+
+    admin.site.register(Post, PostAdmin)
+
+2 - atualizar http://127.0.0.1:8000/admin/website/post/
+
+3 - em models.py, adicionar no fim de 'class Post(models.Model):'   
+    def __str__(self):
+        return self.title
+    exibe o título do post acessado na rota da navbar
+
+4 - criando um campo ordenável na tabela:
+    4.1 - em models.py, adicionar:
+        def full_name(self):
+            return self.title + ' ' + self.sub_title
+
+    4.2 - em admin.py, alterar: 
+        list_display = ['title', 'sub_title', 'full_name']
+
+    4.3 - atualizar http://127.0.0.1:8000/admin/website/post/
+        verificar que o campo não é ordenável
+        
+    4.4 - adicionar em models.py (torna o campo ordenável):
+        full_name.admin_order_field = 'title' 
+
+---
+
+Utilizando TextChoices
+1 - em models.py, adicionar nova class:  
+    class Categorias(models.TextChoices):
+        TECH = 'TC', 'Tecnologia'
+        CR = 'CR', 'Curiosidades'
+        GR = 'GR', 'Geral'
+
+2 - em models.py, adicionar na classe Post:
+    categories = models.CharField(
+            max_length = 2,
+            choices = Categorias.choices,
+            default = Categorias.GR,
+        )
+
+3 - Migrar o novo campo no banco de dados:
+    python3 manage.py makemigrations
+    python3 manage.py migrate
+
+4 - em admin.py > class PostAdmin (exibe em http://127.0.0.1:8000/admin/website/post/) :
+    list_display = ['title', 'sub_title', 'full_name', 'categories']
+
+---
+
+Get queryset - adicionar campo de validação 
+1 - em models.py, adicionar na class Post:
+    deleted = models.BooleanField(default=True)
+
+2 - em admin.py > class PostAdmin:
+    list_display = ['title', 'sub_title', 'full_name', 'categories', 'deleted']
+
+3 - Migrar o novo campo no banco de dados:
+    python3 manage.py makemigrations
+    python3 manage.py migrate
+
+4 - Para visualizar apenas os aprovados
+    4.1 - em admin.py, class PostAdmin:
+        def get_queryset(self, request):
+            return Post.objects.filter(deleted=False)
+
+---
+
+Preparando o template
+1 - https://html5up.net/strata - download, descompactar para a pasta 'strata'
+2 - copiar o index.html e colar na pasta website > 'templates'
+3 - criar pasta website > 'static' e colar as pastas 'assets' e 'images'
+4 - verificar o html em http://127.0.0.1:8000/blog/
+
+---
+
+Renderizando a home page
+1 - Carregar os arquivos estáticos em index.html:
+    {% load_ static %} - antes de <!DOCTYPE HTML>
+
+2 - em index.html, alterar para:
+    <link rel="stylesheet" href="{% static 'assets/css/main.css' %}" /> 
+
+3 - Alterar todas as linhas com arquivos contidos em assets ou images para a mesma estrutura
+    Ex: <script src="{% static 'assets/js/jquery.min.js' %}">
+
+---
+
+Lendo posts do banco de dados
+1 - em index.html, alterar a estrutura dos posts do blog para:
+	{% for post in posts %}
+		<article class="col-6 col-12-xsmall work-item">
+			<a href="{% static 'images/fulls/01.jpg' %}" class="image fit thumb"><img src="{% static 'images/fulls/01.jpg' %}" alt="" /></a>
+			<h3>{{ post.title }}</h3>
+			<p>{{ post.sub_title}}</p>
+			<span>{{ post.categories }}</span>
+		</article>
+	{% endfor %}
+
+2 - em views.py, adicionar em hello_blog():
+    list_posts = Post.objects.filter(deleted=False)
+    (apagar a função get_queryset em admin.py)
+    Alterar a configuração dos posts deletados
+
+---
+
+Criando a página de detalhes do post
+1 - em index.html, adicionar em <article>:
+    <ul class="actions">
+		<li><a href="#" class="button">Ver mais</a></li>
+	</ul>
+
+2 - em urls.py, adicionar:
+    from .views import post_detail
+    e em urlpatterns:
+    path('post/<int:id>/', post_detail),
+
+3 - em views.py, adicionar:
+    def post_detail(request, id):
+        post = Post.objects.get(id=id)
+        return render(request, 'post_detail.html', {'post': post})
+
+4 - Criar arquivo post_detail.html em templates
+    Temporário: <h1>Meu post</h1>
+                {{ post }}
+    
+5 - em urls.py:
+    path('post/<int:id>/', post_detail, name='post_name'),
+
+6 - em index.html:
+    <li><a href="{% url 'post_name' post.id %}" class="button">Ver mais</a></li>
+
+7 - colar o html do index.html (mais o {% load static %}) em post_detail.html
+
+8 - apagar seções 2 e 3 e colar na seção 1:
+	<section id="one">
+		<header class="major">
+            <h2>{{ post.title }}</h2>
+            <h4>{{ post.sub_title }}</h4>
+		</header>
+		<p>{{ post.content }}</p>
+		<ul class="actions">
+			<li><a href="{% url 'home_blog' %}" class="button">Voltar</a></li>
+		</ul>
+	</section>
+
+9 - em urls.py:
+    path('', hello_blog, name='home_blog'),
+
+---
+
+Arquivos de mídia
+1 - Blog > settings.py
+    Adicionar no fim do arquivo: 
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media') 
+
+    MEDIA_URL = '/media/'
+
+2 - em website > models.py > class Post:
+    imagem = models.ImageField(upload_to='posts', null=True, blank=True) 
+
+3 - Migrar o novo campo no banco de dados:
+    python3 manage.py makemigrations
+    python3 manage.py migrate
+
+4 - subir uma imagem em algum dos posts
+
+5 - em post_detail.html, adicionar:
+    <img src="{{ post.imagem.url }}" alt="">
+
+6 - em BLOG > urls.py:
+    from django.conf import settings 
+    from django.conf.urls.static import static
+
+    Após urlpatterns[...], adicionar '+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)'
+
+7 - em index.html, adicionar em <article>:
+    {% if post.imagem %}
+		<img src="{{ post.imagem.url }}" alt="" height="100px" width="400px"/> 
+	{% else %}
+		<a href="{% static 'images/fulls/01.jpg' %}" class="image fit thumb">
+			<img src="{% static 'images/fulls/01.jpg' %}" alt="" /></a>
+	{% endif %}
+
+8 - [opcional] em gitignore, adicionar:
+    venv
+    media
+    
+
+---
+
+Form de contato
+1 - models.py, criar uma nova classe:
+    class Contact(models.Model):
+        name = models.CharField(max_length=150)
+        email = models.EmailField()
+        message = models.TextField()
+
+2 - registrar no admin.py:
+    from .models import Post, Contact
+    admin.site.register(Contact)
+
+3 - criando a rota em website > urls.py:
+    from .views import post_detail, save_form
+    path('save-form/', save_form, name='save_form'),
+
+3 - adicionando em views.py: 
+    def save_form(request):
+        return render(request, 'contact_success.html')  
+
+4 - criar página 'contact_success' em templates e adicionar conteúdo (copiar de post_detail)
+
+5 - em index.html: 
+    <form method="post" action="{% url 'save_form' %}">
+    {% csrf_token %} 
+    <div...
+
+6 - inserir dentro de <form> (está fora no original):
+	<ul class="actions">
+		<li><input type="submit" value="Send Message" /></li>
+	</ul>
+
+7 - inserir em views.py > class save_form:
+    from .models import Post, Contact 
+
+        Contact.objects.create( # cria o contato no BD
+                name=request.POST['name'],
+                email=request.POST['email'],
+                message=request.POST['message']
+        )
+
+8 - Inserir em models.py > class Contact:
+        def __str__(self):
+            return self.name
+    Exibe o nome do contato no painel do admin
+
+9 - Exibir o nome do contato na confirmação:
+    9.1 - Em views.py : save_form, alterar:
+     name = request.POST['name']
+        Contact.objects.create( 
+                name = name,
+                email=request.POST['email'],
+                message=request.POST['message']
+        )
+        return render(request, 'contact_success.html', {'name_contact': name})    
+    
+    9.2 - em contact_success, alterar: 
+        <h1>Obrigado, {{ name_contact }}, seu contato foi recebido</h1>
+            <a href="/">Voltar para a home</a>
+    
+    9.3 - em BLOG > urls.py, alterar:
+        path('', include('website.urls')), 
+        para o endereço principal levar para o blog (http://127.0.0.1:8000)
+
